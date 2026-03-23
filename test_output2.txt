@@ -1,0 +1,14 @@
+﻿
+--- 시도: https://search.naver.com/search.naver?query=%EC%84%9C%EC%9A%B8%20%EC%9...
+  상태: 200 | Content-Type: text/html; charset=UTF-8
+  내용: <!doctype html> <html lang="ko"><head> <meta charset="utf-8"> <meta name="referrer" content="strict-origin-when-cross-origin">  <meta name="format-detection" content="telephone=no,address=no,email=no"> <meta property="og:title" content="서울 인테리어 : 네이버 검색"/> <meta property="og:image" content="https://
+
+--- 시도: https://m.place.naver.com/place/list?query=%EC%84%9C%EC%9A%B8%20%EC%9D...
+  상태: 200 | Content-Type: text/html
+  오류: 'cp949' codec can't encode character '\xeb' in position 80: illegal multibyte sequence
+
+--- 시도: https://map.naver.com/p/api/search/allSearch?query=%EC%84%9C%EC%9A%B8%...
+  상태: 403 | Content-Type: text/html
+
+--- 시도: https://api.place.naver.com/graphql...
+  상태: 400 | Content-Type: application/json; charset=utf-8

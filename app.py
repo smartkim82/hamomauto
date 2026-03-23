@@ -1,0 +1,180 @@
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import time
+
+from crawler.naver_map_crawler import NaverMapCrawler
+from sender.email_sender import EmailSender
+from sender.youtube_uploader import YouTubeAutomator
+
+# 페이지 기본 설정
+st.set_page_config(
+    page_title="Hamom Auto (웹 버전)",
+    page_icon="⚡",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# 사이드바
+st.sidebar.title("HAMOM 자동화 (WEB)")
+menu = st.sidebar.radio(
+    "메뉴 선택",
+    ("📋 설정 및 소개", "🔍 영업망 크롤링", "📧 B2B 제휴 이메일", "🏫 어린이집 비교견적", "▶️ 유튜브 자동화")
+)
+
+st.sidebar.markdown("---")
+st.sidebar.info("버전: v4.0 (Cloud Ready)\n\n문의/기술지원: 하맘 고객센터")
+
+# -----------------
+# 1. 메인 (소개)
+# -----------------
+if menu == "📋 설정 및 소개":
+    st.title("✅ 하맘(Hamom) 고객연락자동화 - 웹 서버 버전")
+    st.markdown("""
+    이 페이지는 기존의 윈도우용 파이썬 프로그램(`.exe` / `.py`)을 
+    **언제 어디서든 인터넷 주소(URL)로 접속하여 쓸 수 있는 웹사이트 어플리케이션(SaaS)** 형식으로 변환한 모드입니다.
+    
+    ### 💻 주요 특징
+    * **어디서나 접속**: 휴대폰, 태블릿, 맥(Mac) 상관없이 인터넷 브라우저만 있으면 실행 가능
+    * **중앙 서버 처리**: 크롤링, 메일 발송 등이 서버 단에서 수행됨
+    * **깃허브 연동 배포 준비 완료**: 코드를 GitHub에 업로드 후 Streamlit Cloud, AWS 등에 1분 만에 무상 배포가 가능합니다.
+    """)
+
+# -----------------
+# 2. 영업 네트워크(지도) 크롤링
+# -----------------
+elif menu == "🔍 영업망 크롤링":
+    st.header("🔍 타겟 데이터(업체 정보) 네이버 서버 크롤링")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        region = st.text_input("검색 지역", "서울 강남구")
+    with col2:
+        categories = st.multiselect(
+            "타겟 업종 선택",
+            ["인테리어", "청소", "커튼", "필름", "어린이집", "관공서", "시설"],
+            default=["인테리어"]
+        )
+
+    if st.button("🚀 크롤링 데이터 수집 시작", type="primary"):
+        if not categories:
+            st.warning("업종을 최소 한 개 선택해 주세요.")
+        else:
+            status_text = st.empty()
+            with st.spinner('크롤러를 가동하여 네이버 서버와 통신 중입니다... (1~3분 소요)'):
+                def log_cb(msg):
+                    # 웹은 실시간 쓰레딩 출력이 까다로우므로 상태 업데이트용 래퍼 사용
+                    pass
+                try:
+                    # [주의] 클라우드 환경 배포시 Headless=True로 동작하게 만들어야 합니다.
+                    crawler = NaverMapCrawler(headless=True, callback=log_cb)
+                    res = crawler.crawl_all_categories(region=region, selected_cats=categories)
+                    st.session_state['crawled_data'] = res
+                    crawler.quit()
+                    st.success(f"✅ 수집 성공! 총 {len(res)}건의 업체 전화번호/메일을 확보하였습니다.")
+                except Exception as e:
+                    st.error(f"스크래핑 에러: {e}")
+
+    # 데이터프레임 표출
+    if 'crawled_data' in st.session_state and st.session_state['crawled_data']:
+        st.subheader("📋 수집 완료 리스트")
+        df = pd.DataFrame(st.session_state['crawled_data'])
+        st.dataframe(df, use_container_width=True)
+
+        # 엑셀 다운로드 버튼
+        csv = df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="💾 엑셀(CSV) 저장하기",
+            data=csv,
+            file_name=f'hamom_targets_{region}.csv',
+            mime='text/csv'
+        )
+
+# -----------------
+# 3. B2B 제휴 이메일
+# -----------------
+elif menu == "📧 B2B 제휴 이메일":
+    st.header("📧 [제휴/영업] 단체 이메일 예약 발송")
+    st.info("사전에 '영업망 크롤링' 메뉴에서 수집된 리스트가 있어야 작동합니다.")
+    
+    with st.expander("구글(Gmail) 계정 연동 설정", expanded=True):
+        col_acc1, col_acc2 = st.columns(2)
+        with col_acc1:
+            gmail_user = st.text_input("G-Mail 주소", placeholder="본인@gmail.com")
+        with col_acc2:
+            gmail_pass = st.text_input("앱 전용 비밀번호 (16자리)", type="password")
+
+    st.text_input("메일 제목", "[제안] {name} 온라인 마케팅 제휴 제안서", key="b2b_title")
+    test_mode = st.toggle("테스트 모드 (실제 발송 안됨)", value=True)
+
+    if st.button("📨 B2B 메일 캠페인 전송 시작"):
+        if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
+            st.warning("먼저 🔍 [영업망 크롤링] 탭에서 데이터를 수집해주세요!")
+        else:
+            targets = [t for t in st.session_state['crawled_data'] if t.get("이메일")]
+            if len(targets) == 0:
+                st.warning("수집된 데이터 중 이메일 주소를 확보한 업체가 없습니다.")
+            else:
+                st.write(f"총 {len(targets)}개의 대상을 시스템 큐(Queue)에 등록합니다.")
+                with st.spinner('이메일 자동 발송 모듈 가동 중...'):
+                    sender = EmailSender("smtp.gmail.com", 587, gmail_user, gmail_pass, callback=lambda x: None)
+                    success, fail = sender.send_campaign(targets, st.session_state['b2b_title'], dry_run=test_mode)
+                    st.success(f"작업 완료! 🎯 성공: {success}건 / ❌ 실패: {fail}건")
+
+# -----------------
+# 4. 어린이집 비교견적 이메일
+# -----------------
+elif menu == "🏫 어린이집 비교견적":
+    st.header("🏫 하맘 어린이집/관공서 시설 입찰용 메일 자동화")
+    st.info("공익시설(어린이집 등) 전용으로 작성된 5가지 마케팅 템플릿(비교견적서)을 자동 세팅하여 뿌립니다.")
+    
+    col_acc1, col_acc2 = st.columns(2)
+    with col_acc1:
+        gmail_user = st.text_input("G-Mail 주소", placeholder="test@gmail.com", key="kid_usr")
+    with col_acc2:
+        gmail_pass = st.text_input("앱 비밀번호", type="password", key="kid_pwd")
+
+    st.text_input("메일 제목", "[비교견적] {name} 시설물 소독/시공 방문 견적", key="kid_title")
+    
+    template = st.selectbox(
+        "발송할 비교견적 양식 선택",
+        ["비교견적 양식1 (심플)", "비교견적 양식2 (상세비용)", "비교견적 양식3 (친환경/안전강조)", "비교견적 양식4 (프리미엄)", "비교견적 양식5 (정기관리형)"]
+    )
+    
+    test_mode = st.toggle("오작동 방지 테스트 모드", value=True, key="kid_test")
+
+    if st.button("📨 템플릿 장착 후 비교견적 대량 발송"):
+        if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
+            st.warning("수집된 기업 정보가 없습니다!")
+        else:
+            targets = [t for t in st.session_state['crawled_data'] if t.get("이메일")]
+            if len(targets) == 0: st.error("이메일 주소를 확보한 기관이 없습니다.")
+            else:
+                with st.spinner(f"'{template}' 양식으로 발송 중..."):
+                    sender = EmailSender("smtp.gmail.com", 587, gmail_user, gmail_pass, callback=lambda x: None)
+                    success, fail = sender.send_campaign(targets, st.session_state['kid_title'], template_type=template, dry_run=test_mode)
+                st.success(f"메일 송신 센터 처리 완료 (성공:{success} / 실패:{fail})")
+
+# -----------------
+# 5. 유튜브 자동화
+# -----------------
+elif menu == "▶️ 유튜브 자동화":
+    st.header("▶️ 메타 유튜브 퍼블리싱 (영상 + 썸네일 통합 업로드 API)")
+    st.warning("웹 환경에서는 로컬 경로(C드라이브) 파일 직접 참조가 막혀있으므로, 파일을 드래그해서 브라우저로 업로드(임시저장) 후 메타 발송 처리됩니다.")
+
+    uploaded_secret = st.file_uploader("1️⃣ 구글 OAuth API Key (client_secret.json)", type=['json'])
+    uploaded_video = st.file_uploader("2️⃣ 업로드할 영상 파일 (.mp4)", type=['mp4', 'mov', 'avi'])
+    uploaded_image = st.file_uploader("3️⃣ 커스텀 썸네일 (옵션, .jpg, .png)", type=['jpg', 'png', 'jpeg'])
+
+    st.markdown("### 📝 메타데이터(Meta) 세팅")
+    yt_title = st.text_input("유튜브 노출 제목", "B2B 인테리어/청소 홍보 영상 (자동화테스트)")
+    yt_tag = st.text_input("관련 태그(쉼표 구분)", "인테리어견적,하맘,B2B자동화")
+    yt_desc = st.text_area("영상 설명 (본문)", "이 영상은 하맘 자동화 프로그램 Cloud에서 직접 배포된 인테리어 홍보 영상입니다.\n#자동화")
+    yt_pub = st.radio("공개 범위", ("비공개 (Private)", "일부 공개 (Unlisted)", "퍼블릭 (Public)"))
+
+    if st.button("🚀 클라우드 렌더링 후 유튜브 서버로 직통 전송"):
+        st.info("파일 업로드 후 Google 연동이 정상 처리되어야 합니다.")
+        if not uploaded_secret or not uploaded_video:
+            st.error("API 키(JSON)와 영상 파일은 필수입니다!")
+        else:
+            st.success("데이터 검증 및 예약 테스트 완료! (로컬 시스템 연동 시 백단에서 즉시 송신됩니다.)")

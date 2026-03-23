@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.env
+.DS_Store
+*.xlsx
+*.csv
+# 인증을 위한 중요정보 포함된 json 깃허브 업로드 제외 필수!!!
+client_secret.json
+token.json
