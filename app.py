@@ -181,7 +181,8 @@ elif menu == "🔍 B2B 영업망 크롤링":
         else:
             log_container = st.empty()
             image_placeholder = st.empty()
-            with st.spinner('크롤러를 가동 중입니다... 실시간 검색 뷰어를 확인하세요.'):
+            st.error("🛑 **[크롤링 중단 방법]** 로봇이 지나치게 많은 목록을 긁어오느라 계속 돌고 있다면 화면 **우측 상단 모서리에 뜨는 [✕ Stop] 글씨**를 누르시면 로봇의 전원이 즉시 차단됩니다.")
+            with st.spinner('AI 로봇 렌즈가 가동 중입니다... (멈추려면 우측 상단 STOP 클릭)'):
                 def log_cb(msg, screenshot=None):
                     if 'logs' not in st.session_state:
                         st.session_state['logs'] = ""
