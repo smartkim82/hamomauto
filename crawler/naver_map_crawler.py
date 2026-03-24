@@ -92,10 +92,10 @@ class NaverMapCrawler:
             EC.frame_to_be_available_and_switch_to_it((By.CSS_SELECTOR, "iframe#entryIframe"))
         )
 
-    def search_businesses(self, keyword, region="", max_results=30):
+    def search_businesses(self, keyword, region="", max_results=300):
         query = f"{region} {keyword}".strip()
         url = f"https://map.naver.com/p/search/{query}"
-        self._log(f"검색 시작: {query}")
+        self._log(f"검색 시작: {query} (최대 {max_results}건 전체 스크롤 시도)")
         
         self.driver.get(url)
         time.sleep(3)
@@ -148,18 +148,16 @@ class NaverMapCrawler:
                         
                     item = current_items[index]
                     
-                    # 스크롤해서 보이게 하기
-                    self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", item)
-                    time.sleep(0.5)
-                    
-                    # 클릭하여 우측 상세정보 열기
+                    # 클릭하여 우측 상세정보 열기 (부동산 포함 어떤 구조든 강제 클릭)
                     try:
-                        name_el = item.find_element(By.CSS_SELECTOR, ".place_bluelink, .TYaxT, .YwYLL, a.P7gyV")
+                        name_el = item.find_element(By.CSS_SELECTOR, "a.place_bluelink, a.U70Fj, a.P7gyV, a.k4f_J, .TYaxT, .YwYLL")
                         name_text = name_el.text.strip()
                         self._log(f"[{len(collected)+1}] 파싱 중: {name_text}")
-                        name_el.click()
-                    except ElementClickInterceptedException:
+                        # 텍스트 대신 JS 강제 클릭으로 무조건 상세 페이지 오픈
                         self.driver.execute_script("arguments[0].click();", name_el)
+                    except Exception as clk_e:
+                        self.driver.execute_script("arguments[0].click();", item.find_element(By.TAG_NAME, "a"))
+                    
                     
                     time.sleep(2.5) # 상세 프레임 로딩 대기
                     
@@ -265,7 +263,7 @@ class NaverMapCrawler:
         except:
             return ""
 
-    def crawl_all_categories(self, region="", max_per_keyword=30, selected_cats=None):
+    def crawl_all_categories(self, region="", max_per_keyword=300, selected_cats=None):
         cats = selected_cats or list(CATEGORY_KEYWORDS.keys())
         all_results = []
 

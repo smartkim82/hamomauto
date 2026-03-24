@@ -225,25 +225,32 @@ elif menu == "📝 사업체 자동제안서 (이메일 발송 포함)":
         ai_style = st.selectbox("제안서 분위기 (AI 프롬프트 생성용)", ["전문적인", "따뜻하고 감성적인", "신뢰를 주는 프리미엄형", "나노바나나 아트 스타일"])
 
     if st.button("✨ 제안서 문구 자동 창작(생성)", type="primary"):
-        st.session_state['proposal_content_b2b'] = f"""
-=======================================
-[{company_name}] 제휴 및 안내 제안서
-=======================================
+        st.session_state['proposal_content_b2b'] = f"""[Business Proposal] {company_name} - 전략적 업무 제휴 및 파트너십 제안의 건
 
 수신: {target_name} 
-발신: {company_name}
+발신: {company_name} 전략사업부
 
-안녕하십니까, 공간에 새로운 가치를 부여하는 {company_name}입니다.
+안녕하십니까, 귀사의 무궁한 발전과 건승을 기원합니다.
+저희는 차별화된 비즈니스 역량과 혁신적인 솔루션을 바탕으로 공간과 서비스에 새로운 가치를 창출하는 {company_name}입니다.
 
-[우리 회사의 핵심 역량]
+금번 연락을 드리게 된 목적은 당사가 보유한 전문 인프라와 귀사의 우수한 사업 역량을 결합하여, 양사 간 상호 윈-윈(Win-Win)할 수 있는 전략적 파트너십을 제안 드리기 위함입니다.
+
+[당사 핵심 역량 및 제휴 포인트]
 {services}
 
-위 사항을 바탕으로 상호 시너지를 낼 수 있는 최고의 제안을 드립니다.
-본 제안서를 확인하시고, 긍정적인 검토 부탁드립니다.
+저희는 일방적인 제안이 아닌, 귀사의 비즈니스 방향성과 운영 방침을 최우선으로 존중하며 유연하고 합리적인 협의점을 도출할 준비가 되어 있습니다. 본 제안과 관련하여 추가적인 수익 창출 모델이나 비용 절감 방안 등 어떠한 형태의 비즈니스 논의도 환영합니다.
+
+바쁘신 업무 중에 본 제안서를 검토해 주셔서 깊은 감사를 드립니다.
+시간이 허락하실 때 짧은 대면/비대면 미팅이나 유선 상으로 보다 실질적이고 가치 있는 협업 모델을 논의 드릴 수 있기를 진심으로 희망합니다.
+
+긍정적인 화답을 기다리겠습니다.
+감사합니다.
+
+{company_name} 배상
 
 ---------------------------------------
 [🎨 나노바나나(Niji/Midjourney) AI 이미지용 프롬프트]
-"A beautiful, high-quality cover design for a B2B proposal. Clean layout, modern typography, bright lighting, {ai_style} style, 8k resolution, photorealistic --ar 16:9 --v 6"
+"A beautiful, high-quality cover design for a B2B proposal. Clean layout, modern corporate and professional typography, bright lighting, {ai_style} style, 8k resolution, photorealistic --ar 16:9 --v 6"
 ---------------------------------------
 """
         st.success("✅ 제안서 초안이 작성되었습니다! (문서 다운로드 또는 이메일 바로 전송 가능)")
