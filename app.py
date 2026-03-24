@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import time
+import io
+from docx import Document
+from fpdf import FPDF
 
 from crawler.naver_map_crawler import NaverMapCrawler
 from sender.email_sender import EmailSender
@@ -22,7 +25,7 @@ if 'is_authenticated' not in st.session_state:
 st.sidebar.title("HAMOM 자동화 (WEB)")
 menu = st.sidebar.radio(
     "메뉴 선택",
-    ("📋 설정 및 소개", "🔍 영업망 크롤링", "📊 수집 리스트 정리", "📧 B2B 제휴 이메일", "🏫 어린이집 비교견적", "▶️ 유튜브 자동화")
+    ("📋 설정 및 소개", "🔍 영업망 크롤링", "📊 수집 리스트 정리", "📝 제안서 자동만들기", "📧 B2B 제휴 이메일", "🏫 어린이집 비교견적서 발송", "▶️ 유튜브 자동화")
 )
 
 st.sidebar.markdown("---")
@@ -154,6 +157,84 @@ elif menu == "📊 수집 리스트 정리":
         st.session_state['crawled_data'] = edited_df.to_dict('records')
 
 # -----------------
+# 2-6. 제안서 자동만들기
+# -----------------
+elif menu == "📝 제안서 자동만들기":
+    st.header("📝 AI 제안서 자동 생성 (이미지 및 문서 추출)")
+    st.info("내용만 입력하면 '나노바나나(Niji)' 스타일의 생성형 AI 프롬프트와 함께 깔끔한 제안서 형식 문자열을 만들어 한글(Word) / PDF 형태로 다운받을 수 있습니다.")
+    
+    if not st.session_state['is_authenticated']:
+        st.error("🔒 관리자 비밀번호를 먼저 사이드바에 입력하여 잠금을 해제해주세요.")
+    else:
+        col1, col2 = st.columns(2)
+        with col1:
+            company_name = st.text_input("당사 업체명", "하맘 인테리어")
+            services = st.text_area("주요 서비스 및 특징", "- 신속한 방문 시공\n- 친환경 자재 사용\n- 1년 무상 A/S 보장")
+            
+        with col2:
+            target_name = st.text_input("보내실 대상 (예: 거래처/어린이집/관공서)", "VIP 고객님")
+            ai_style = st.selectbox("제안서 분위기 (AI 테마)", ["전문적인 (Professional)", "따뜻하고 감성적인", "신뢰를 주는 프리미엄형", "나노바나나 일러스트레이션 룩"])
+
+        if st.button("✨ 제안서 텍스트 및 프롬프트 생성"):
+            st.session_state['proposal_content'] = f"""
+=======================================
+[{company_name}] 제휴 및 안내 제안서
+=======================================
+
+수신: {target_name} 귀하
+발신: {company_name}
+
+안녕하십니까, 
+귀하의 공간에 새로운 가치를 부여하는 {company_name}입니다.
+
+[우리 회사의 핵심 역량]
+{services}
+
+위 사항을 바탕으로 상호 시너지를 낼 수 있는 최고의 제안을 드리고자 합니다. 
+본 제안서를 확인하시고, 긍정적인 검토 부탁드립니다.
+
+---------------------------------------
+[🎨 나노바나나 AI 이미지 생성용 프롬프트]
+"A beautiful, high-quality, professional cover design for an interior proposal. Clean layout, modern typography, bright lighting, {ai_style} style, 8k resolution, photorealistic --ar 16:9 --v 6"
+---------------------------------------
+"""
+            st.success("✅ 제안서 텍스트가 완성되었습니다! 내용을 확인하시고 문서를 다운받아 B2B 이메일 발송에 활용해 보세요.")
+
+        if 'proposal_content' in st.session_state:
+            st.text_area("생성된 제안서 미리보기", st.session_state['proposal_content'], height=400)
+            
+            # DOCX 만들기
+            doc = Document()
+            doc.add_heading(f"{company_name} 제안서", 0)
+            doc.add_paragraph(st.session_state['proposal_content'])
+            doc_io = io.BytesIO()
+            doc.save(doc_io)
+            doc_io.seek(0)
+            
+            # PDF 만들기 (기본 FPDF)
+            pdf = FPDF()
+            pdf.add_page("P")
+            try:
+                # 폰트 깨짐 방지를 위해 인코딩/기본 뷰만 세팅 (로컬 폰트 필요하나 기본체로 우회)
+                pdf.set_font("Arial", size=12)
+                # 한글 처리가 fpdf 기본에 없으므로 영문 알파벳 우회나 오류 회피 위주 (임시)
+                fixed_text = st.session_state['proposal_content'].encode('ascii', 'replace').decode('ascii')
+                pdf.multi_cell(0, 10, txt=fixed_text)
+            except Exception as e:
+                pdf.cell(200, 10, txt="PDF Encoding Error(Need Korean TTF font)", ln=1)
+
+            pdf_io = io.BytesIO()
+            pdf_str = pdf.output(dest='S').encode('latin-1')
+            pdf_io.write(pdf_str)
+            pdf_io.seek(0)
+
+            col_down1, col_down2 = st.columns(2)
+            with col_down1:
+                st.download_button("📥 Word(문서) 다운로드", doc_io, f"{company_name}_제안서.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            with col_down2:
+                st.download_button("📥 PDF 다운로드", pdf_io, f"{company_name}_제안서.pdf", "application/pdf")
+
+# -----------------
 # 3. B2B 제휴 이메일
 # -----------------
 elif menu == "📧 B2B 제휴 이메일":
@@ -188,9 +269,9 @@ elif menu == "📧 B2B 제휴 이메일":
                     st.success(f"작업 완료! 🎯 성공: {success}건 / ❌ 실패: {fail}건")
 
 # -----------------
-# 4. 어린이집 비교견적 이메일
+# 4. 어린이집 비교견적서 발송
 # -----------------
-elif menu == "🏫 어린이집 비교견적":
+elif menu == "🏫 어린이집 비교견적서 발송":
     st.header("🏫 하맘 어린이집/관공서 시설 입찰용 메일 자동화")
     st.info("공익시설(어린이집 등) 전용으로 작성된 5가지 마케팅 템플릿(비교견적서)을 자동 세팅하여 뿌립니다.")
     
