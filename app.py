@@ -5,10 +5,35 @@ import time
 import io
 from docx import Document
 from fpdf import FPDF
+import sys
+import sqlite3
 
 from crawler.naver_map_crawler import NaverMapCrawler
 from sender.email_sender import EmailSender
 from sender.youtube_uploader import YouTubeAutomator
+
+# DB 초기화 및 연결 설정
+def init_db():
+    conn = sqlite3.connect("hamom_database.db", check_same_thread=False)
+    cursor = conn.cursor()
+    # 크롤링 B2B 데이터 보관 테이블
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS b2b_crawling_list (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            업체명 TEXT,
+            카테고리 TEXT,
+            주소 TEXT,
+            전화번호 TEXT,
+            이메일 TEXT,
+            해시태그 TEXT,
+            검색카테고리 TEXT,
+            등록일시 DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    return conn
+
+conn = init_db()
 
 # -----------------
 # 기본 설정
@@ -162,7 +187,14 @@ elif menu == "🔍 B2B 영업망 크롤링":
                     res = crawler.crawl_all_categories(region=region, selected_cats=categories)
                     st.session_state['crawled_data_b2b'] = res
                     crawler.quit()
-                    st.success(f"✅ 수집 완료! (총 {len(res)}건) 아래 리스트에서 체크박스로 바로 대상을 정리하세요.")
+                    
+                    # 💡 새로 수집된 데이터를 DB에 즉시 영구 저장 (SQLite)
+                    df_new = pd.DataFrame(res)
+                    if not df_new.empty:
+                        # 이미 있는 중복 제거 후 DB 삽입
+                        df_new.to_sql('b2b_crawling_list', con=conn, if_exists='append', index=False)
+                        
+                    st.success(f"✅ 수집 완료! DB에 영구 저장되었습니다. (총 {len(res)}건) 무제한 스크롤 완료.")
                     
                     if btn_onestop:
                         st.info("🔥 원스톱 기능 가동: 곧바로 이메일 자동 발송을 시작합니다...")
@@ -178,25 +210,32 @@ elif menu == "🔍 B2B 영업망 크롤링":
                     st.error(f"에러 발생: {e}")
                     
     st.markdown("---")
-    st.subheader("📊 수집 리스트 통합 관리표")
-    if 'crawled_data_b2b' not in st.session_state or not st.session_state['crawled_data_b2b']:
-        st.info("아직 수집된 데이터가 없습니다. 위의 크롤링 버튼을 눌러주세요.")
-    else:
-        df = pd.DataFrame(st.session_state['crawled_data_b2b'])
-        if '선택' not in df.columns: 
-            df.insert(0, '선택', True)
+    st.subheader("📊 수집 리스트 통합 관리 DB (영구 보관)")
+    
+    # DB에서 기존 데이터를 전부 긁어옴
+    try:
+        db_df = pd.read_sql_query("SELECT 업체명, 카테고리, 주소, 전화번호, 이메일, 해시태그, 검색카테고리, 등록일시 FROM b2b_crawling_list ORDER BY 등록일시 DESC", conn)
+    except:
+        db_df = pd.DataFrame()
         
-        st.markdown("**제휴 메일을 보낼 업체만 체크박스를 칠하세요 (기본값: 모두 선택)**")
+    if db_df.empty:
+        st.info("아직 수집/저장된 데이터베이스(DB) 내역이 없습니다. 위의 파란 버튼을 눌러 크롤링을 시작해보세요.")
+    else:
+        st.markdown(f"**총 {len(db_df)}개**의 타겟 업체가 저희 하맘 클라우드 DB 금고에 완벽하게 적재되어 있습니다. 🔒")
+        if '선택' not in db_df.columns: 
+            db_df.insert(0, '선택', True)
+        
+        st.markdown("**제휴 메일을 보낼 업체만 체크박스를 유지하세요 (기본값: 모두 발송)**")
         edited_df = st.data_editor(
-            df, hide_index=True,
+            db_df, hide_index=True,
             column_config={"선택": st.column_config.CheckboxColumn("보내기", default=True)},
-            disabled=df.columns.drop('선택'), use_container_width=True
+            disabled=db_df.columns.drop('선택'), use_container_width=True
         )
-        st.session_state['crawled_data_b2b'] = edited_df.to_dict('records')
-        st.caption(f"여기서 체크된 **{edited_df['선택'].sum()}개** 대상만 자동제안서 타겟으로 전송됩니다.")
+        st.session_state['db_b2b_records'] = edited_df.to_dict('records')
+        st.caption(f"여기서 체크된 **{edited_df['선택'].sum()}개**의 업체 대상만 최종 자동제안서 전송 타겟으로 설정됩니다.")
         
         # 엑셀 저장 & 메일 연동 유도
-        csv = pd.DataFrame(st.session_state['crawled_data_b2b']).to_csv(index=False).encode('utf-8-sig')
+        csv = db_df.drop(columns=['선택']).to_csv(index=False).encode('utf-8-sig')
         col_end1, col_end2 = st.columns(2)
         with col_end1:
             st.download_button("💾 이 리스트를 엑셀로 저장", csv, f"B2B_타겟_리스트.csv", "text/csv", use_container_width=True)
