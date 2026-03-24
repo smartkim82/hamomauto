@@ -41,18 +41,29 @@ class NaverMapCrawler:
         self._setup_driver(headless)
 
     def _setup_driver(self, headless):
+        import sys
+        
         options = Options()
         if headless:
             options.add_argument("--headless=new")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1280,1024")
         options.add_argument("--disable-blink-features=AutomationControlled")
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
         
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=options)
+        if sys.platform.startswith('linux'):
+            # Streamlit Cloud (Debian) 환경
+            options.binary_location = '/usr/bin/chromium'
+            service = Service('/usr/bin/chromedriver')
+            self.driver = webdriver.Chrome(service=service, options=options)
+        else:
+            # Windows / 로컬 환경
+            service = Service(ChromeDriverManager().install())
+            self.driver = webdriver.Chrome(service=service, options=options)
+            
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
     def _log(self, msg):
