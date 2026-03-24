@@ -61,9 +61,9 @@ if category == "📋 대시보드 및 설정":
     menus = ["소개 및 메인"]
 elif category == "📦 1. 수집 자동화":
     menus = [
-        "🔍 B2B 영업망 크롤링 (실시간 검색 화면)", "📊 수집 리스트 정리 (영업망)", 
-        "📸 SNS셀럽 크롤링 (인스타/유튜브)", "📊 수집 리스트 정리 (SNS)", 
-        "🏭 제조업체 크롤링", "📊 수집 리스트 정리 (제조업체)"
+        "🔍 B2B 영업망 크롤링",
+        "📸 SNS 셀럽 크롤링",
+        "🏭 제조업체 크롤링"
     ]
 elif category == "📤 2. 발송 자동화":
     menus = [
@@ -115,9 +115,9 @@ if menu == "소개 및 메인":
 # ----------------------------------------------------
 # 2. 수집 자동화
 # ----------------------------------------------------
-elif menu == "🔍 B2B 영업망 크롤링 (실시간 검색 화면)":
-    st.header("🔍 [수집] B2B 영업망 데이터 자동 수집기")
-    st.markdown("네이버 지도를 기반으로 인테리어, 청소, 시설 등 영업 타겟을 추출합니다.")
+elif menu == "🔍 B2B 영업망 크롤링":
+    st.header("🔍 [수집] B2B 영업망 자동 수집 및 리스트 정리")
+    st.markdown("네이버에서 연락처를 추출한 뒤, **아래 표에서 바로 정리하고 파일을 저장**할 수 있습니다.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -125,7 +125,7 @@ elif menu == "🔍 B2B 영업망 크롤링 (실시간 검색 화면)":
     with col2:
         categories = st.multiselect("타겟 업종 선택", ["인테리어", "청소", "커튼", "필름", "어린이집", "관공서", "시설"], default=["인테리어"])
 
-    if st.button("🚀 B2B 크롤링 시작 및 실시간 모니터링", type="primary"):
+    if st.button("🚀 크롤링 시작 및 실시간 모니터링", type="primary"):
         if not st.session_state['is_authenticated']:
             st.error("🔒 관리자 잠김 상태입니다. 사이드바에 비밀번호를 입력해주세요.")
         elif not categories:
@@ -134,7 +134,6 @@ elif menu == "🔍 B2B 영업망 크롤링 (실시간 검색 화면)":
             log_container = st.empty()
             image_placeholder = st.empty()
             with st.spinner('크롤러를 가동 중입니다... 실시간 검색 뷰어를 확인하세요.'):
-                # 실시간 로그 래퍼 (Streamlit에서 UI 업데이트)
                 def log_cb(msg, screenshot=None):
                     if 'logs' not in st.session_state:
                         st.session_state['logs'] = ""
@@ -148,33 +147,36 @@ elif menu == "🔍 B2B 영업망 크롤링 (실시간 검색 화면)":
                     res = crawler.crawl_all_categories(region=region, selected_cats=categories)
                     st.session_state['crawled_data_b2b'] = res
                     crawler.quit()
-                    st.success(f"✅ 수집 성공! 총 {len(res)}건 완료. '수집 리스트 정리' 탭으로 이동하세요.")
+                    st.success(f"✅ 수집 완료! (총 {len(res)}건) 아래 리스트에서 체크박스로 바로 대상을 정리하세요.")
                 except Exception as e:
                     st.error(f"에러 발생: {e}")
-
-elif menu == "📊 수집 리스트 정리 (영업망)":
-    st.header("📊 B2B 영업망 리스트 검수 및 내보내기")
+                    
+    st.markdown("---")
+    st.subheader("📊 수집 리스트 통합 관리표")
     if 'crawled_data_b2b' not in st.session_state or not st.session_state['crawled_data_b2b']:
-        st.warning("먼저 B2B 크롤링을 진행해주세요.")
+        st.info("아직 수집된 데이터가 없습니다. 위의 크롤링 버튼을 눌러주세요.")
     else:
         df = pd.DataFrame(st.session_state['crawled_data_b2b'])
-        if '선택' not in df.columns: df.insert(0, '선택', True)
+        if '선택' not in df.columns: 
+            df.insert(0, '선택', True)
         
+        st.markdown("**제휴 메일을 보낼 업체만 체크박스를 칠하세요 (기본값: 모두 선택)**")
         edited_df = st.data_editor(
             df, hide_index=True,
             column_config={"선택": st.column_config.CheckboxColumn("보내기", default=True)},
             disabled=df.columns.drop('선택'), use_container_width=True
         )
         st.session_state['crawled_data_b2b'] = edited_df.to_dict('records')
-        st.info("여기서 선택(체크)된 대상만 '사업체 자동제안서' 타겟으로 쓰입니다.")
+        st.caption(f"여기서 체크된 **{edited_df['선택'].sum()}개** 대상만 자동제안서 타겟으로 전송됩니다.")
+        
+        # 엑셀 저장
+        csv = pd.DataFrame(st.session_state['crawled_data_b2b']).to_csv(index=False).encode('utf-8-sig')
+        st.download_button("💾 이 리스트를 엑셀(CSV)로 저장", csv, f"B2B_타겟_리스트.csv", "text/csv")
 
-elif menu in ["📸 SNS셀럽 크롤링 (인스타/유튜브)", "🏭 제조업체 크롤링"]:
-    st.header(f"🔍 [준비중] {menu.split()[1]} 데이터 수집기")
-    st.info("SNS(인스타그램 DM, 유튜브 이메일) 및 공장/제조업체 검색 자동화 시스템 인프라 구축 공사 중입니다.")
-
-elif menu in ["📊 수집 리스트 정리 (SNS)", "📊 수집 리스트 정리 (제조업체)"]:
-    st.header(f"📊 [준비중] 리스트 정리 에디터")
-    st.info("크롤링이 완료된 후 표를 열방향으로 확인하고 선택할 수 있는 데이터 에디터입니다.")
+elif menu in ["📸 SNS 셀럽 크롤링", "🏭 제조업체 크롤링"]:
+    st.header(f"🔍 [진행 예정] {menu}")
+    st.info("SNS(인스타그램 DM, 유튜브 이메일) 및 공장/제조업체 검색 추출기 기능이 들어올 예정입니다.")
+    st.markdown("이곳 아래에도 곧 B2B 망처럼 **크롤링 화면**과 **표(데이터에디터) 정리 기능**을 한 페이지로 통합 제공할 것입니다.")
 
 # ----------------------------------------------------
 # 3. 발송 자동화
