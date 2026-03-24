@@ -149,7 +149,15 @@ elif menu == "🔍 B2B 영업망 크롤링":
         region = st.text_input("검색 지역", "서울 강남구")
     with col2:
         categories_input = st.text_input("🎯 타겟 업종 (원하는 키워드를 쉼표로 구분해 맘껏 적어보세요!)", "부동산, 인테리어, 청소, 식당")
-        categories = [c.strip() for c in categories_input.split(",") if c.strip()]
+        
+        categories = []
+        for c in categories_input.split(","):
+            val = c.strip()
+            if val:
+                # 네이버 지도는 '부동산' 검색 시 매물 페이지로 이동해버리므로 '공인중개사'로 강제 치환
+                if "부동산" in val:
+                    val = val.replace("부동산", "공인중개사")
+                categories.append(val)
 
     with st.expander("🔥 [초고속 원스톱] 크롤링부터 메일 발송까지 한 번에 (설정)"):
         st.warning("이 기능을 켜고 아래 원스톱 버튼을 누르면, 검색된 모든 대상에게 즉시 제안서 메일이 폭격됩니다.")
