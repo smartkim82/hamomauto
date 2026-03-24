@@ -125,11 +125,25 @@ elif menu == "🔍 B2B 영업망 크롤링":
     with col2:
         categories = st.multiselect("타겟 업종 선택", ["인테리어", "청소", "커튼", "필름", "어린이집", "관공서", "시설"], default=["인테리어"])
 
-    if st.button("🚀 크롤링 시작 및 실시간 모니터링", type="primary"):
+    with st.expander("🔥 [초고속 원스톱] 크롤링부터 메일 발송까지 한 번에 (설정)"):
+        st.warning("이 기능을 켜고 아래 원스톱 버튼을 누르면, 검색된 모든 대상에게 즉시 제안서 메일이 폭격됩니다.")
+        cs_email = st.text_input("G-Mail 주소", placeholder="test@gmail.com", key="os_usr")
+        cs_pwd = st.text_input("앱 비밀번호", type="password", key="os_pwd")
+        cs_title = st.text_input("발송될 메일 제목", "[하맘] 원스톱 자동화 제안서", key="os_title")
+
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        btn_normal = st.button("🚀 기본 크롤링 수집만 시작", type="primary", use_container_width=True)
+    with col_btn2:
+        btn_onestop = st.button("🔥 [원스톱] 크롤링 + 자동 메일 동시 진행", type="primary", use_container_width=True)
+
+    if btn_normal or btn_onestop:
         if not st.session_state['is_authenticated']:
             st.error("🔒 관리자 잠김 상태입니다. 사이드바에 비밀번호를 입력해주세요.")
         elif not categories:
             st.warning("업종을 선택해주세요.")
+        elif btn_onestop and (not cs_email or not cs_pwd):
+            st.error("원스톱 기능을 쓰려면 위의 톱니바퀴에서 지메일 계정/비밀번호 설정을 기입해야 합니다!")
         else:
             log_container = st.empty()
             image_placeholder = st.empty()
@@ -148,6 +162,17 @@ elif menu == "🔍 B2B 영업망 크롤링":
                     st.session_state['crawled_data_b2b'] = res
                     crawler.quit()
                     st.success(f"✅ 수집 완료! (총 {len(res)}건) 아래 리스트에서 체크박스로 바로 대상을 정리하세요.")
+                    
+                    if btn_onestop:
+                        st.info("🔥 원스톱 기능 가동: 곧바로 이메일 자동 발송을 시작합니다...")
+                        targets = [t for t in res if str(t.get('이메일', '')).strip() != '']
+                        if not targets:
+                            st.warning("수집된 데이터 중 이메일 주소를 가진 대상이 없습니다.")
+                        else:
+                            sender = EmailSender("smtp.gmail.com", 587, cs_email, cs_pwd, callback=lambda x: None)
+                            success, fail = sender.send_campaign(targets, cs_title, dry_run=False)
+                            st.success(f"원스톱 발송 성공! 🎯 [성공: {success} / 실패: {fail}]")
+                            
                 except Exception as e:
                     st.error(f"에러 발생: {e}")
                     
@@ -169,9 +194,14 @@ elif menu == "🔍 B2B 영업망 크롤링":
         st.session_state['crawled_data_b2b'] = edited_df.to_dict('records')
         st.caption(f"여기서 체크된 **{edited_df['선택'].sum()}개** 대상만 자동제안서 타겟으로 전송됩니다.")
         
-        # 엑셀 저장
+        # 엑셀 저장 & 메일 연동 유도
         csv = pd.DataFrame(st.session_state['crawled_data_b2b']).to_csv(index=False).encode('utf-8-sig')
-        st.download_button("💾 이 리스트를 엑셀(CSV)로 저장", csv, f"B2B_타겟_리스트.csv", "text/csv")
+        col_end1, col_end2 = st.columns(2)
+        with col_end1:
+            st.download_button("💾 이 리스트를 엑셀로 저장", csv, f"B2B_타겟_리스트.csv", "text/csv", use_container_width=True)
+        with col_end2:
+            if st.button("📨 이 리스트 메일발송 (제안서 탭 설정)", use_container_width=True):
+                st.info("👆 좌측 사이드바의 **[발송 자동화 > 사업체 자동제안서]** 메뉴를 누르시면 방금 체크하신 이 리스트에 메일을 자동 발송할 수 있습니다.")
 
 elif menu in ["📸 SNS 셀럽 크롤링", "🏭 제조업체 크롤링"]:
     st.header(f"🔍 [진행 예정] {menu}")
