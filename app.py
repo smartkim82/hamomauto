@@ -12,8 +12,11 @@ st.set_page_config(
     page_title="Hamom Auto (웹 버전)",
     page_icon="⚡",
     layout="wide",
-    initial_sidebar_state="expanded"
 )
+
+# 인증 상태 초기화
+if 'is_authenticated' not in st.session_state:
+    st.session_state['is_authenticated'] = False
 
 # 사이드바
 st.sidebar.title("HAMOM 자동화 (WEB)")
@@ -24,6 +27,20 @@ menu = st.sidebar.radio(
 
 st.sidebar.markdown("---")
 st.sidebar.info("📞 문의/기술지원\n**하맘 고객센터: 1660-1195**\n\n버전: v4.1 (Cloud Ready)")
+
+st.sidebar.markdown("---")
+if not st.session_state['is_authenticated']:
+    st.sidebar.warning("🔒 기능이 잠겨있습니다.")
+    pwd_input = st.sidebar.text_input("잠금 해제 비밀번호", type="password")
+    if pwd_input == "1191004":
+        st.session_state['is_authenticated'] = True
+        st.sidebar.success("✅ 잠금 해제 완료!")
+        st.rerun()
+else:
+    st.sidebar.success("🔓 잠금 해제 상태 (모든 기능 사용 가능)")
+    if st.sidebar.button("다시 잠금"):
+        st.session_state['is_authenticated'] = False
+        st.rerun()
 
 # -----------------
 # 1. 메인 (소개)
@@ -57,7 +74,9 @@ elif menu == "🔍 영업망 크롤링":
         )
 
     if st.button("🚀 크롤링 데이터 수집 시작", type="primary"):
-        if not categories:
+        if not st.session_state['is_authenticated']:
+            st.error("🔒 관리자 비밀번호를 먼저 사이드바에 입력하여 잠금을 해제해주세요.")
+        elif not categories:
             st.warning("업종을 최소 한 개 선택해 주세요.")
         else:
             status_text = st.empty()
@@ -152,7 +171,9 @@ elif menu == "📧 B2B 제휴 이메일":
     test_mode = st.toggle("테스트 모드 (실제 발송 안됨)", value=True)
 
     if st.button("📨 B2B 메일 캠페인 전송 시작"):
-        if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
+        if not st.session_state['is_authenticated']:
+            st.error("🔒 관리자 비밀번호를 먼저 사이드바에 입력하여 잠금을 해제해주세요.")
+        elif 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
             st.warning("먼저 🔍 [영업망 크롤링] 탭에서 데이터를 수집해주세요!")
         else:
             # "선택" 컬럼이 True 인 것 + "이메일" 정보가 있는것만 추림
@@ -189,7 +210,9 @@ elif menu == "🏫 어린이집 비교견적":
     test_mode = st.toggle("오작동 방지 테스트 모드", value=True, key="kid_test")
 
     if st.button("📨 템플릿 장착 후 비교견적 대량 발송"):
-        if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
+        if not st.session_state['is_authenticated']:
+            st.error("🔒 관리자 비밀번호를 먼저 사이드바에 입력하여 잠금을 해제해주세요.")
+        elif 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
             st.warning("수집된 기업 정보가 없습니다!")
         else:
             # "선택" 컬럼이 True 인 것 + "이메일" 정보가 있는것만 추림
@@ -219,7 +242,10 @@ elif menu == "▶️ 유튜브 자동화":
     yt_pub = st.radio("공개 범위", ("비공개 (Private)", "일부 공개 (Unlisted)", "퍼블릭 (Public)"))
 
     if st.button("🚀 클라우드 렌더링 후 유튜브 서버로 직통 전송"):
-        st.info("파일 업로드 후 Google 연동이 정상 처리되어야 합니다.")
+        if not st.session_state['is_authenticated']:
+            st.error("🔒 관리자 비밀번호를 먼저 사이드바에 입력하여 잠금을 해제해주세요.")
+        else:
+            st.info("파일 업로드 후 Google 연동이 정상 처리되어야 합니다.")
         if not uploaded_secret or not uploaded_video:
             st.error("API 키(JSON)와 영상 파일은 필수입니다!")
         else:
