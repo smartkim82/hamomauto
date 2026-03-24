@@ -123,10 +123,10 @@ class NaverMapCrawler:
             
             time.sleep(2)
             
-            # 목록 파싱
-            items = self.driver.find_elements(By.CSS_SELECTOR, "li[data-laim-exp-id]")
+            # 목록 파싱 (범용 셀렉터 확장 - 부동산, 병원 등 포함)
+            items = self.driver.find_elements(By.CSS_SELECTOR, "#_pcmap_list_scroll_container ul > li.VLTHu, #_pcmap_list_scroll_container ul > li.UEHAh, li[data-laim-exp-id]")
             if not items:
-                items = self.driver.find_elements(By.CSS_SELECTOR, ".VLTHu")
+                items = self.driver.find_elements(By.CSS_SELECTOR, "#_pcmap_list_scroll_container li")
             
             self._log(f"현재 페이지에서 {len(items)}개 항목 발견", capture=True)
             
@@ -139,9 +139,9 @@ class NaverMapCrawler:
                     self._switch_to_search_iframe()
                     
                     # element 갱신
-                    current_items = self.driver.find_elements(By.CSS_SELECTOR, "li[data-laim-exp-id]")
+                    current_items = self.driver.find_elements(By.CSS_SELECTOR, "#_pcmap_list_scroll_container ul > li.VLTHu, #_pcmap_list_scroll_container ul > li.UEHAh, li[data-laim-exp-id]")
                     if not current_items:
-                        current_items = self.driver.find_elements(By.CSS_SELECTOR, ".VLTHu")
+                        current_items = self.driver.find_elements(By.CSS_SELECTOR, "#_pcmap_list_scroll_container li")
                         
                     if index >= len(current_items):
                         continue
@@ -154,7 +154,7 @@ class NaverMapCrawler:
                     
                     # 클릭하여 우측 상세정보 열기
                     try:
-                        name_el = item.find_element(By.CSS_SELECTOR, ".TYaxT, .place_bluelink, .YwYLL")
+                        name_el = item.find_element(By.CSS_SELECTOR, ".place_bluelink, .TYaxT, .YwYLL, a.P7gyV")
                         name_text = name_el.text.strip()
                         self._log(f"[{len(collected)+1}] 파싱 중: {name_text}")
                         name_el.click()
