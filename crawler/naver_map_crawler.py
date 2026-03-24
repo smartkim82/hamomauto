@@ -8,9 +8,12 @@ B2B 업체 (인테리어, 청소, 커튼, 필름) 정보 수집
 import time
 import random
 import re
+import logging
 from base64 import b64decode
 import pandas as pd
+import sqlite3
 from datetime import datetime
+from bs4 import BeautifulSoup
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -166,6 +169,32 @@ class NaverMapCrawler:
                     if detail:
                         collected.append(detail)
                         self._log(f"   => 성공: {detail['전화번호']} | {detail['주소'][:15]}", capture=True)
+                        
+                        # 💡 [실시간 금고 저장] 1건 수집될 때마다 즉시 SQLite DB에 투입 (중간 Stop 방어)
+                        try:
+                            import sqlite3
+                            conn = sqlite3.connect("hamom_database.db", check_same_thread=False)
+                            cursor = conn.cursor()
+                            cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS b2b_crawling_list (
+                                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                    업체명 TEXT, 카테고리 TEXT, 주소 TEXT, 전화번호 TEXT, 이메일 TEXT,
+                                    해시태그 TEXT, 검색카테고리 TEXT, 등록일시 DATETIME DEFAULT CURRENT_TIMESTAMP
+                                )
+                            ''')
+                            # 중복 검사
+                            cursor.execute("SELECT id FROM b2b_crawling_list WHERE 업체명=? AND 전화번호=?", (detail['업체명'], detail['전화번호']))
+                            if not cursor.fetchone():
+                                cursor.execute('''
+                                    INSERT INTO b2b_crawling_list (업체명, 카테고리, 주소, 전화번호, 이메일, 해시태그, 검색카테고리)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                                ''', (detail.get('업체명',''), detail.get('카테고리',''), detail.get('주소',''), 
+                                      detail.get('전화번호',''), detail.get('이메일',''), detail.get('해시태그',''), query))
+                                conn.commit()
+                            conn.close()
+                        except Exception as db_err:
+                            self._log(f"DB 저장 에러: {db_err}")
+                            
                     else:
                         self._log("   => 실패 (정보 누락)")
                         
