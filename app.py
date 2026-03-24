@@ -19,11 +19,11 @@ st.set_page_config(
 st.sidebar.title("HAMOM 자동화 (WEB)")
 menu = st.sidebar.radio(
     "메뉴 선택",
-    ("📋 설정 및 소개", "🔍 영업망 크롤링", "📧 B2B 제휴 이메일", "🏫 어린이집 비교견적", "▶️ 유튜브 자동화")
+    ("📋 설정 및 소개", "🔍 영업망 크롤링", "📊 수집 리스트 정리", "📧 B2B 제휴 이메일", "🏫 어린이집 비교견적", "▶️ 유튜브 자동화")
 )
 
 st.sidebar.markdown("---")
-st.sidebar.info("버전: v4.0 (Cloud Ready)\n\n문의/기술지원: 하맘 고객센터")
+st.sidebar.info("📞 문의/기술지원\n**하맘 고객센터: 1660-1195**\n\n버전: v4.1 (Cloud Ready)")
 
 # -----------------
 # 1. 메인 (소개)
@@ -89,6 +89,50 @@ elif menu == "🔍 영업망 크롤링":
             file_name=f'hamom_targets_{region}.csv',
             mime='text/csv'
         )
+        st.info("데이터가 수집되었습니다. '📊 수집 리스트 정리' 메뉴로 이동하여 받을 대상을 고르세요!")
+
+# -----------------
+# 2-5. 수집 리스트 정리 부분
+# -----------------
+elif menu == "📊 수집 리스트 정리":
+    st.header("📊 크롤링 데이터 및 이메일 전송 리스트 정리")
+    st.markdown("수십, 수백 개의 업체 중에서 **제휴 이메일을 보낼 업체만 체크(선택)** 할 수 있습니다.")
+    
+    # 엑셀 업로드로 데이터 가져오기도 지원
+    uploaded_file = st.file_uploader("📂 기존에 다운받은 엑셀(CSV) 파일 불러오기", type=['csv'])
+    if uploaded_file is not None:
+        try:
+            df = pd.read_csv(uploaded_file)
+            st.session_state['crawled_data'] = df.to_dict('records')
+            st.success("데이터를 성공적으로 불러왔습니다.")
+        except Exception as e:
+            st.error(f"파일 양식이 맞지 않습니다: {e}")
+
+    if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
+        st.warning("먼저 🔍 [영업망 크롤링] 에서 데이터를 수집하거나 파일을 업로드해 주세요.")
+    else:
+        df = pd.DataFrame(st.session_state['crawled_data'])
+        
+        # '선택' 컬럼 추가
+        if '선택' not in df.columns:
+            df.insert(0, '선택', True)
+        
+        st.markdown("**(체크박스를 해제하면 이메일 발송에서 제외됩니다)**")
+        
+        # 데이터 에디터로 수정 가능한 테이블 제공 (선택 컬럼만 수정 가능하게)
+        edited_df = st.data_editor(
+            df, 
+            hide_index=True,
+            column_config={"선택": st.column_config.CheckboxColumn("보내기", help="이메일 발송 여부 선택", default=True)},
+            disabled=df.columns.drop('선택'), # 선택 빼고 다 수정불가
+            use_container_width=True
+        )
+        
+        selected_count = edited_df['선택'].sum()
+        st.info(f"✅ 총 {len(edited_df)}곳 중 **{selected_count}곳**이 이메일 전송 대상으로 선택되었습니다.")
+        
+        # 세션에 최신 상태 저장
+        st.session_state['crawled_data'] = edited_df.to_dict('records')
 
 # -----------------
 # 3. B2B 제휴 이메일
@@ -111,7 +155,8 @@ elif menu == "📧 B2B 제휴 이메일":
         if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
             st.warning("먼저 🔍 [영업망 크롤링] 탭에서 데이터를 수집해주세요!")
         else:
-            targets = [t for t in st.session_state['crawled_data'] if t.get("이메일")]
+            # "선택" 컬럼이 True 인 것 + "이메일" 정보가 있는것만 추림
+            targets = [t for t in st.session_state['crawled_data'] if t.get('선택', True) and str(t.get('이메일', '')).strip() != '']
             if len(targets) == 0:
                 st.warning("수집된 데이터 중 이메일 주소를 확보한 업체가 없습니다.")
             else:
@@ -147,7 +192,8 @@ elif menu == "🏫 어린이집 비교견적":
         if 'crawled_data' not in st.session_state or not st.session_state['crawled_data']:
             st.warning("수집된 기업 정보가 없습니다!")
         else:
-            targets = [t for t in st.session_state['crawled_data'] if t.get("이메일")]
+            # "선택" 컬럼이 True 인 것 + "이메일" 정보가 있는것만 추림
+            targets = [t for t in st.session_state['crawled_data'] if t.get('선택', True) and str(t.get('이메일', '')).strip() != '']
             if len(targets) == 0: st.error("이메일 주소를 확보한 기관이 없습니다.")
             else:
                 with st.spinner(f"'{template}' 양식으로 발송 중..."):
