@@ -66,10 +66,19 @@ class NaverMapCrawler:
             
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
 
-    def _log(self, msg):
+    def _log(self, msg, capture=False):
         print(f"[크롤러] {msg}")
         if self.callback:
-            self.callback(msg)
+            screenshot = None
+            if capture and self.driver:
+                try:
+                    screenshot = self.driver.get_screenshot_as_png()
+                except:
+                    pass
+            try:
+                self.callback(msg, screenshot=screenshot)
+            except TypeError:
+                self.callback(msg)
 
     def _switch_to_search_iframe(self):
         self.driver.switch_to.default_content()
@@ -119,7 +128,7 @@ class NaverMapCrawler:
             if not items:
                 items = self.driver.find_elements(By.CSS_SELECTOR, ".VLTHu")
             
-            self._log(f"현재 페이지에서 {len(items)}개 항목 발견")
+            self._log(f"현재 페이지에서 {len(items)}개 항목 발견", capture=True)
             
             for index in range(len(items)):
                 if len(collected) >= max_results:
@@ -158,7 +167,7 @@ class NaverMapCrawler:
                     detail = self._extract_detail_info(name_text)
                     if detail:
                         collected.append(detail)
-                        self._log(f"   => 성공: {detail['전화번호']} | {detail['주소'][:15]}")
+                        self._log(f"   => 성공: {detail['전화번호']} | {detail['주소'][:15]}", capture=True)
                     else:
                         self._log("   => 실패 (정보 누락)")
                         

@@ -33,7 +33,7 @@ st.sidebar.title("하맘자동화 (WEB)")
 st.sidebar.markdown("---")
 if not st.session_state['is_authenticated']:
     st.sidebar.warning("🔒 관리자 잠금 상태입니다.")
-    pwd_input = st.sidebar.text_input("잠금 해제 비밀번호 (1191004)", type="password")
+    pwd_input = st.sidebar.text_input("잠금 해제 비밀번호", type="password")
     if pwd_input == "1191004":
         st.session_state['is_authenticated'] = True
         st.sidebar.success("✅ 잠금 해제 완료! 모든 기능 사용 가능")
@@ -61,7 +61,7 @@ if category == "📋 대시보드 및 설정":
     menus = ["소개 및 메인"]
 elif category == "📦 1. 수집 자동화":
     menus = [
-        "🔍 B2B 영업망 크롤링 (진행 과정 미리보기)", "📊 수집 리스트 정리 (영업망)", 
+        "🔍 B2B 영업망 크롤링 (실시간 검색 화면)", "📊 수집 리스트 정리 (영업망)", 
         "📸 SNS셀럽 크롤링 (인스타/유튜브)", "📊 수집 리스트 정리 (SNS)", 
         "🏭 제조업체 크롤링", "📊 수집 리스트 정리 (제조업체)"
     ]
@@ -115,7 +115,7 @@ if menu == "소개 및 메인":
 # ----------------------------------------------------
 # 2. 수집 자동화
 # ----------------------------------------------------
-elif menu == "🔍 B2B 영업망 크롤링 (진행 과정 미리보기)":
+elif menu == "🔍 B2B 영업망 크롤링 (실시간 검색 화면)":
     st.header("🔍 [수집] B2B 영업망 데이터 자동 수집기")
     st.markdown("네이버 지도를 기반으로 인테리어, 청소, 시설 등 영업 타겟을 추출합니다.")
     
@@ -132,14 +132,16 @@ elif menu == "🔍 B2B 영업망 크롤링 (진행 과정 미리보기)":
             st.warning("업종을 선택해주세요.")
         else:
             log_container = st.empty()
-            with st.spinner('크롤러를 가동 중입니다... 터미널 미리보기를 확인하세요.'):
+            image_placeholder = st.empty()
+            with st.spinner('크롤러를 가동 중입니다... 실시간 검색 뷰어를 확인하세요.'):
                 # 실시간 로그 래퍼 (Streamlit에서 UI 업데이트)
-                def log_cb(msg):
+                def log_cb(msg, screenshot=None):
                     if 'logs' not in st.session_state:
                         st.session_state['logs'] = ""
                     st.session_state['logs'] += f"{msg}\n"
-                    # 최신 500자 정도만 화면에 출력 (스크롤 흉내)
-                    log_container.text_area("💻 작업 실시간 로그 (터미널 미리보기)", st.session_state['logs'][-2000:], height=300)
+                    log_container.text_area("💻 작업 실시간 로그", st.session_state['logs'][-2000:], height=100)
+                    if screenshot:
+                        image_placeholder.image(screenshot, caption="👀 AI 로봇 실시간 검색 뷰어", use_container_width=True)
 
                 try:
                     crawler = NaverMapCrawler(headless=True, callback=log_cb)
